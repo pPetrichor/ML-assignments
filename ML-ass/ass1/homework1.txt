@@ -1,0 +1,52 @@
+#加载数据集
+import numpy as np
+from sklearn.model_selection import RepeatedKFold
+from sklearn import preprocessing
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, recall_score
+
+filename = 'yeast.data'
+data = np.loadtxt(filename, dtype=str, usecols=[1, 2, 3, 4, 5, 6, 7, 8, 9], unpack=False)
+X = data[:, :8].astype(np.float64)
+Y = data[:, 8]
+
+#数据预处理
+minmax_scaler = preprocessing.MinMaxScaler()
+X_minmax = minmax_scaler.fit_transform(X)
+
+#要测试的分类器
+logOvR_model = LogisticRegression(multi_class='ovr', max_iter=1000, class_weight='balanced')
+logOvO_model = LogisticRegression(multi_class='multinomial', max_iter=1000, class_weight='balanced')
+
+acc_logOvR = 0
+recall_logOvR = 0
+
+acc_logOvO = 0
+recall_logOvO = 0
+
+kf = RepeatedKFold(n_splits=10, n_repeats=10, random_state=5)
+
+for train_index, test_index in kf.split(X):
+    #划分数据集
+    X_train = X[train_index]
+    X_test = X[test_index]
+    Y_train = Y[train_index]
+    Y_test = Y[test_index]
+
+    #训练:OvR, LR, 采用默认的求解器lbfgs
+    logOvR_model.fit(X_train, Y_train)
+    Y_logOvR_pred = logOvR_model.predict(X_test)
+    #计算准确率与召回率
+    acc_logOvR += accuracy_score(Y_test, Y_logOvR_pred)
+    recall_logOvR += recall_score(Y_test, Y_logOvR_pred, average="macro")
+
+
+    #训练:OvO, LR, 采用默认的求解器lbfgs
+    logOvO_model.fit(X_train, Y_train)
+    Y_logOvO_pred = logOvO_model.predict(X_test)
+    #计算准确率与召回率
+    acc_logOvO += accuracy_score(Y_test, Y_logOvO_pred)
+    recall_logOvO += recall_score(Y_test, Y_logOvO_pred, average="macro")
+
+print('OvR+LR结果：', acc_logOvR / 100, recall_logOvR / 100)
+print('OvO+LR结果：', acc_logOvO / 100, recall_logOvO / 100)
